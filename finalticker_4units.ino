@@ -3,6 +3,9 @@
 #include <ArduinoJson.h>
 #include <MD_MAX72xx.h>
 #include <SPI.h>
+#include <TimeLib.h>
+#include <NTPClient.h>
+#include <WiFiUdp.h>
 
 // Hardware configuration
 #define HARDWARE_TYPE MD_MAX72XX::FC16_HW
@@ -22,6 +25,13 @@ const char* password = "mauskatzehund.123";
 // API endpoint for fetching Bitcoin prices
 const char* apiEndpointUSD = "https://api.coindesk.com/v1/bpi/currentprice/USD.json";
 
+// NTP client to get the time
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP, "pool.ntp.org");
+
+// Timezone offset in seconds (default Brussels, UTC+1)
+long timezoneOffset = 3600;
+
 void setup() {
   // Initialize serial communication
   Serial.begin(115200);
@@ -40,15 +50,44 @@ void setup() {
     Serial.println("Connecting to WiFi...");
   }
   Serial.println("Connected to WiFi");
+
+  // Initialize the time client with the timezone offset
+  timeClient.begin();
+  timeClient.setTimeOffset(timezoneOffset);
 }
 
 void loop() {
-  if (WiFi.status() == WL_CONNECTED) {
-    // Fetch Bitcoin price in USD
-    displayBitcoinPrice(apiEndpointUSD, "USD");
+  static unsigned long lastUpdate = 0;
+  timeClient.update();
+
+  // Display time continuously
+  displayTime();
+
+  // Every minute, show the Bitcoin price for a few seconds
+  if (millis() - lastUpdate >= 60000) {
+    if (WiFi.status() == WL_CONNECTED) {
+      displayBitcoinPrice(apiEndpointUSD, "USD");
+    }
+    lastUpdate = millis();
   }
+
+  delay(1000); // Update the time display every second
+}
+
+void displayTime() {
+  mx.clear();
   
-  delay(60000); // Update every minute
+  // Get the current time
+  int hours = timeClient.getHours();
+  int minutes = timeClient.getMinutes();
+
+  // Format the time as HH:MM
+  char timeString[6];
+  sprintf(timeString, "%02d:%02d", hours, minutes);
+
+  // Display the time on MAX7219
+  mx.print(timeString);
+  mx.update();
 }
 
 void displayBitcoinPrice(const char* apiEndpoint, const char* currency) {
