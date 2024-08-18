@@ -3,7 +3,6 @@
 #include <ArduinoJson.h>
 #include <MD_MAX72xx.h>
 #include <SPI.h>
-#include <TimeLib.h>
 #include <NTPClient.h>
 #include <WiFiUdp.h>
 
@@ -24,16 +23,14 @@ const char* password = "mauskatzehund.123";
 
 // API endpoints
 const char* apiEndpointUSD = "https://api.coindesk.com/v1/bpi/currentprice/USD.json";
-const char* apiEndpointBlockHeight = "https://mempool.space/api/blocks/tip/height";
+const char* apiBlockHeight = "https://blockchain.info/q/getblockcount";
 
-// NTP client to get the time
+// NTP Client to get time
 WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, "pool.ntp.org");
+NTPClient timeClient(ntpUDP, "pool.ntp.org", 0, 60000); // Update time every minute
 
-// Timezone offset in seconds (default Brussels, UTC+1)
-long timezoneOffset = 3600;
-
-int lastBlockHeight = 0;
+// Variable to store the last fetched block height
+long lastBlockHeight = 0;
 
 void setup() {
   // Initialize serial communication
@@ -41,7 +38,7 @@ void setup() {
   
   // Initialize the MAX7219 display
   SPI.begin(CLK_PIN, MISO, DATA_PIN, CS_PIN);
-  SPI.setFrequency(1000000); // Set SPI baud rate to 1 MHz (adjust as needed)
+  SPI.setFrequency(1000000); // Set SPI baud rate to 1 MHz
   mx.begin();
   mx.control(MD_MAX72XX::INTENSITY, 0); // Set brightness (0-15)
   mx.clear();
@@ -54,52 +51,26 @@ void setup() {
   }
   Serial.println("Connected to WiFi");
 
-  // Initialize the time client with the timezone offset
+  // Initialize time client
   timeClient.begin();
-  timeClient.setTimeOffset(timezoneOffset);
+  timeClient.update();
 }
 
 void loop() {
-  static unsigned long lastUpdate = 0;
-  timeClient.update();
-
-  // Display time continuously
-  displayTime();
-
-  // Every minute, show the Bitcoin price for a few seconds
-  if (millis() - lastUpdate >= 60000) {
-    if (WiFi.status() == WL_CONNECTED) {
-      displayBitcoinPrice(apiEndpointUSD, "USD");
-    }
-    lastUpdate = millis();
-  }
-
-  // Check for a new block
   if (WiFi.status() == WL_CONNECTED) {
-    int currentBlockHeight = getLatestBlockHeight();
-    if (currentBlockHeight > lastBlockHeight) {
-      displayNewBlockHeight(currentBlockHeight);
-      lastBlockHeight = currentBlockHeight;
-    }
+    // Display the current time
+    displayTime();
+    delay(10000); // Display time for 10 seconds
+    
+    // Fetch Bitcoin price in USD
+    displayBitcoinPrice(apiEndpointUSD, "USD");
+    delay(10000); // Display price for 10 seconds
+    
+    // Check for new block mined
+    checkNewBlockMined(apiBlockHeight);
   }
-
-  delay(1000); // Update the time display every second
-}
-
-void displayTime() {
-  mx.clear();
   
-  // Get the current time
-  int hours = timeClient.getHours();
-  int minutes = timeClient.getMinutes();
-
-  // Format the time as HH:MM
-  char timeString[6];
-  sprintf(timeString, "%02d:%02d", hours, minutes);
-
-  // Display the time on MAX7219
-  mx.print(timeString);
-  mx.update();
+  delay(1000); // Short delay to avoid rapid looping
 }
 
 void displayBitcoinPrice(const char* apiEndpoint, const char* currency) {
@@ -125,19 +96,8 @@ void displayBitcoinPrice(const char* apiEndpoint, const char* currency) {
 
     // Display the price on MAX7219 display
     mx.clear();
-    int length = strlen(priceChars);
-
-    // Start displaying characters from 5 pixels to the front
-    int x = 5;
-
-    // Display characters from the array in reverse order (mirrored)
-    for (int i = length - 1; i >= 0; i--) {
-      char c = priceChars[i];
-      mx.setChar(x, c);
-      x += 6; // Move to the next character position (assuming 6 pixels per character)
-    }
+    mx.print(priceChars);
     mx.update(); // Update the display
-    delay(5000); // Display time for 5 seconds
   } else {
     Serial.println("Error fetching Bitcoin price for " + String(currency));
   }
@@ -145,41 +105,56 @@ void displayBitcoinPrice(const char* apiEndpoint, const char* currency) {
   http.end();
 }
 
-int getLatestBlockHeight() {
-  HTTPClient http;
-  http.begin(apiEndpointBlockHeight);
-  int httpResponseCode = http.GET();
+void displayTime() {
+  timeClient.update();
+  String formattedTime = timeClient.getFormattedTime();
+  String timeToDisplay = formattedTime.substring(0, 5); // Display HH:MM
 
-  int blockHeight = -1;
+  // Convert time string to individual characters
+  char timeChars[6];
+  timeToDisplay.toCharArray(timeChars, 6);
+
+  // Display the time on MAX7219 display
+  mx.clear();
+  mx.print(timeChars);
+  mx.update(); // Update the display
+}
+
+void checkNewBlockMined(const char* apiEndpoint) {
+  HTTPClient http;
+  http.begin(apiEndpoint);
+  int httpResponseCode = http.GET();
 
   if (httpResponseCode > 0) {
     String payload = http.getString();
-    blockHeight = payload.toInt();
+    long currentBlockHeight = payload.toInt();
+
+    if (currentBlockHeight > lastBlockHeight) {
+      lastBlockHeight = currentBlockHeight;
+      
+      // Get the last 5 digits of the block height
+      String blockHeightStr = String(currentBlockHeight);
+      String blockHeightLast5 = blockHeightStr.substring(blockHeightStr.length() - 5);
+
+      // Flash the block height 3 times
+      for (int i = 0; i < 3; i++) {
+        mx.clear();
+        mx.print(blockHeightLast5.c_str());
+        mx.update();
+        delay(500); // Show for 500ms
+        mx.clear();
+        delay(500); // Off for 500ms
+      }
+      
+      // Show the block height for an additional 5 seconds
+      mx.clear();
+      mx.print(blockHeightLast5.c_str());
+      mx.update();
+      delay(5000); // Display time for 5 seconds
+    }
   } else {
-    Serial.println("Error fetching latest block height");
+    Serial.println("Error fetching block height");
   }
 
   http.end();
-  return blockHeight;
-}
-
-void displayNewBlockHeight(int blockHeight) {
-  // Convert block height to string
-  char blockHeightString[10];
-  sprintf(blockHeightString, "%d", blockHeight);
-
-  for (int i = 0; i < 3; i++) {
-    mx.clear();
-    mx.print(blockHeightString);
-    mx.update();
-    delay(500); // On for 500ms
-    mx.clear();
-    delay(500); // Off for 500ms
-  }
-
-  // Display the block height for a few seconds after flicker
-  mx.clear();
-  mx.print(blockHeightString);
-  mx.update();
-  delay(5000); // Display for 5 seconds
 }
