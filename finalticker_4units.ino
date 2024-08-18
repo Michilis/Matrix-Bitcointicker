@@ -24,9 +24,9 @@ const char* password = "mauskatzehund.123";
 // API endpoint for fetching Bitcoin prices
 const char* apiEndpointUSD = "https://api.coindesk.com/v1/bpi/currentprice/USD.json";
 
-// NTP Client to get time
+// NTP Client to get time (Brussels timezone is UTC + 2 hours during DST, adjust as needed)
 WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, "pool.ntp.org", 7200, 60000); // Brussels time is UTC +2
+NTPClient timeClient(ntpUDP, "pool.ntp.org", 7200, 60000); // Brussels is UTC+2
 
 void setup() {
   // Initialize serial communication
@@ -54,13 +54,12 @@ void setup() {
 
 void loop() {
   if (WiFi.status() == WL_CONNECTED) {
-    // Display the current time
-    displayTime();
-    delay(10000); // Display time for 10 seconds
-    
-    // Fetch Bitcoin price in USD
+    // Alternate between displaying Bitcoin price and time every 10 seconds
     displayBitcoinPrice(apiEndpointUSD, "USD");
-    delay(10000); // Display price for 10 seconds
+    delay(10000); // Show for 10 seconds
+
+    displayTime();
+    delay(10000); // Show for 10 seconds
   }
 
   delay(1000); // Short delay to avoid rapid looping
@@ -83,9 +82,15 @@ void displayBitcoinPrice(const char* apiEndpoint, const char* currency) {
     // Get only the first 5 characters of the price
     String priceFirst5 = price.substring(0, 5);
 
+    // Center the text in the display
+    int offset = (MAX_DEVICES * 8 - priceFirst5.length() * 6) / 2;
+
     // Display the price on MAX7219 display
     mx.clear();
-    printText(priceFirst5.c_str());
+    for (int i = 0; i < priceFirst5.length(); i++) {
+      mx.setChar(offset + i * 6, priceFirst5[i]);
+    }
+    mx.update();
   } else {
     Serial.println("Error fetching Bitcoin price for " + String(currency));
   }
@@ -95,21 +100,15 @@ void displayBitcoinPrice(const char* apiEndpoint, const char* currency) {
 
 void displayTime() {
   timeClient.update();
-  String formattedTime = timeClient.getFormattedTime();
-  String timeToDisplay = formattedTime.substring(0, 5); // Display HH:MM
+  String formattedTime = timeClient.getFormattedTime().substring(0, 5); // Display HH:MM
+
+  // Center the text in the display
+  int offset = (MAX_DEVICES * 8 - formattedTime.length() * 6) / 2;
 
   // Display the time on MAX7219 display
   mx.clear();
-  printText(timeToDisplay.c_str());
-}
-
-void printText(const char* text) {
-  uint8_t len = strlen(text);
-
-  for (uint8_t i = 0; i < len; i++) {
-    mx.clear();
-    mx.setChar(0, text[i]);
-    mx.update();
-    delay(1000);
+  for (int i = 0; i < formattedTime.length(); i++) {
+    mx.setChar(offset + i * 6, formattedTime[i]);
   }
+  mx.update();
 }
