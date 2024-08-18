@@ -90,13 +90,11 @@ void displayBitcoinPrice(const char* apiEndpoint, const char* currency) {
     // Get only the first 5 characters of the price
     String priceFirst5 = price.substring(0, 5);
 
-    // Convert price string to individual characters
-    char priceChars[6]; // Limit to 5 characters
-    priceFirst5.toCharArray(priceChars, 6);
-
     // Display the price on MAX7219 display
     mx.clear();
-    mx.print(priceChars);
+    for (int i = 0; i < priceFirst5.length(); i++) {
+      mx.setChar(i * 8, priceFirst5[i]);
+    }
     mx.update(); // Update the display
   } else {
     Serial.println("Error fetching Bitcoin price for " + String(currency));
@@ -110,13 +108,11 @@ void displayTime() {
   String formattedTime = timeClient.getFormattedTime();
   String timeToDisplay = formattedTime.substring(0, 5); // Display HH:MM
 
-  // Convert time string to individual characters
-  char timeChars[6];
-  timeToDisplay.toCharArray(timeChars, 6);
-
   // Display the time on MAX7219 display
   mx.clear();
-  mx.print(timeChars);
+  for (int i = 0; i < timeToDisplay.length(); i++) {
+    mx.setChar(i * 8, timeToDisplay[i]);
+  }
   mx.update(); // Update the display
 }
 
@@ -139,7 +135,9 @@ void checkNewBlockMined(const char* apiEndpoint) {
       // Flash the block height 3 times
       for (int i = 0; i < 3; i++) {
         mx.clear();
-        mx.print(blockHeightLast5.c_str());
+        for (int j = 0; j < blockHeightLast5.length(); j++) {
+          mx.setChar(j * 8, blockHeightLast5[j]);
+        }
         mx.update();
         delay(500); // Show for 500ms
         mx.clear();
@@ -148,7 +146,9 @@ void checkNewBlockMined(const char* apiEndpoint) {
       
       // Show the block height for an additional 5 seconds
       mx.clear();
-      mx.print(blockHeightLast5.c_str());
+      for (int i = 0; i < blockHeightLast5.length(); i++) {
+        mx.setChar(i * 8, blockHeightLast5[i]);
+      }
       mx.update();
       delay(5000); // Display time for 5 seconds
     }
