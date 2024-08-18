@@ -3,7 +3,6 @@
 #include <ArduinoJson.h>
 #include <MD_MAX72xx.h>
 #include <SPI.h>
-#include <TimeLib.h>
 #include <NTPClient.h>
 #include <WiFiUdp.h>
 
@@ -25,12 +24,9 @@ const char* password = "mauskatzehund.123";
 // API endpoint for fetching Bitcoin prices
 const char* apiEndpointUSD = "https://api.coindesk.com/v1/bpi/currentprice/USD.json";
 
-// NTP client to get the time
+// NTP Client to get time
 WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, "pool.ntp.org");
-
-// Timezone offset in seconds (default Brussels, UTC+1)
-long timezoneOffset = 3600;
+NTPClient timeClient(ntpUDP, "pool.ntp.org", 7200, 60000); // Brussels time is UTC +2
 
 void setup() {
   // Initialize serial communication
@@ -51,43 +47,23 @@ void setup() {
   }
   Serial.println("Connected to WiFi");
 
-  // Initialize the time client with the timezone offset
+  // Initialize time client
   timeClient.begin();
-  timeClient.setTimeOffset(timezoneOffset);
+  timeClient.update();
 }
 
 void loop() {
-  static unsigned long lastUpdate = 0;
-  timeClient.update();
-
-  // Display time continuously
-  displayTime();
-
-  // Every minute, show the Bitcoin price for a few seconds
-  if (millis() - lastUpdate >= 60000) {
-    if (WiFi.status() == WL_CONNECTED) {
-      displayBitcoinPrice(apiEndpointUSD, "USD");
-    }
-    lastUpdate = millis();
+  if (WiFi.status() == WL_CONNECTED) {
+    // Display the current time
+    displayTime();
+    delay(10000); // Display time for 10 seconds
+    
+    // Fetch Bitcoin price in USD
+    displayBitcoinPrice(apiEndpointUSD, "USD");
+    delay(10000); // Display price for 10 seconds
   }
 
-  delay(1000); // Update the time display every second
-}
-
-void displayTime() {
-  mx.clear();
-  
-  // Get the current time
-  int hours = timeClient.getHours();
-  int minutes = timeClient.getMinutes();
-
-  // Format the time as HH:MM
-  char timeString[6];
-  sprintf(timeString, "%02d:%02d", hours, minutes);
-
-  // Display the time on MAX7219
-  mx.print(timeString);
-  mx.update();
+  delay(1000); // Short delay to avoid rapid looping
 }
 
 void displayBitcoinPrice(const char* apiEndpoint, const char* currency) {
@@ -107,28 +83,33 @@ void displayBitcoinPrice(const char* apiEndpoint, const char* currency) {
     // Get only the first 5 characters of the price
     String priceFirst5 = price.substring(0, 5);
 
-    // Convert price string to individual characters
-    char priceChars[6]; // Limit to 5 characters
-    priceFirst5.toCharArray(priceChars, 6);
-
     // Display the price on MAX7219 display
     mx.clear();
-    int length = strlen(priceChars);
-
-    // Start displaying characters from 5 pixels to the front
-    int x = 5;
-
-    // Display characters from the array in reverse order (mirrored)
-    for (int i = length - 1; i >= 0; i--) {
-      char c = priceChars[i];
-      mx.setChar(x, c);
-      x += 6; // Move to the next character position (assuming 6 pixels per character)
-    }
-    mx.update(); // Update the display
-    delay(5000); // Display time for 5 seconds
+    printText(priceFirst5.c_str());
   } else {
     Serial.println("Error fetching Bitcoin price for " + String(currency));
   }
 
   http.end();
+}
+
+void displayTime() {
+  timeClient.update();
+  String formattedTime = timeClient.getFormattedTime();
+  String timeToDisplay = formattedTime.substring(0, 5); // Display HH:MM
+
+  // Display the time on MAX7219 display
+  mx.clear();
+  printText(timeToDisplay.c_str());
+}
+
+void printText(const char* text) {
+  uint8_t len = strlen(text);
+
+  for (uint8_t i = 0; i < len; i++) {
+    mx.clear();
+    mx.setChar(0, text[i]);
+    mx.update();
+    delay(1000);
+  }
 }
