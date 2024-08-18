@@ -28,6 +28,10 @@ const char* apiEndpointUSD = "https://api.coindesk.com/v1/bpi/currentprice/USD.j
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "pool.ntp.org", 7200, 60000); // Brussels is UTC+2
 
+// Display intervals (in milliseconds)
+const unsigned long displayBitcoinPriceDuration = 21000; // 21 seconds
+const unsigned long displayTimeDuration = 30000; // 30 seconds
+
 void setup() {
   // Initialize serial communication
   Serial.begin(115200);
@@ -54,12 +58,12 @@ void setup() {
 
 void loop() {
   if (WiFi.status() == WL_CONNECTED) {
-    // Alternate between displaying Bitcoin price and time every 10 seconds
+    // Alternate between displaying Bitcoin price and time
     displayBitcoinPrice(apiEndpointUSD, "USD");
-    delay(10000); // Show for 10 seconds
+    delay(displayBitcoinPriceDuration); // Show Bitcoin price for the configured duration
 
     displayTime();
-    delay(10000); // Show for 10 seconds
+    delay(displayTimeDuration); // Show time for the configured duration
   }
 
   delay(1000); // Short delay to avoid rapid looping
@@ -82,15 +86,24 @@ void displayBitcoinPrice(const char* apiEndpoint, const char* currency) {
     // Get only the first 5 characters of the price
     String priceFirst5 = price.substring(0, 5);
 
-    // Center the text in the display
-    int offset = (MAX_DEVICES * 8 - priceFirst5.length() * 6) / 2;
+    // Convert price string to individual characters
+    char priceChars[6]; // Limit to 5 characters
+    priceFirst5.toCharArray(priceChars, 6);
 
     // Display the price on MAX7219 display
     mx.clear();
-    for (int i = 0; i < priceFirst5.length(); i++) {
-      mx.setChar(offset + i * 6, priceFirst5[i]);
+    int length = strlen(priceChars);
+
+    // Start displaying characters from 5 pixels to the front
+    int x = 5;
+
+    // Display characters from the array in reverse order (mirrored)
+    for (int i = length - 1; i >= 0; i--) {
+      char c = priceChars[i];
+      mx.setChar(x, c);
+      x += 6; // Move to the next character position (assuming 6 pixels per character)
     }
-    mx.update();
+    mx.update(); // Update the display
   } else {
     Serial.println("Error fetching Bitcoin price for " + String(currency));
   }
@@ -102,13 +115,19 @@ void displayTime() {
   timeClient.update();
   String formattedTime = timeClient.getFormattedTime().substring(0, 5); // Display HH:MM
 
-  // Center the text in the display
-  int offset = (MAX_DEVICES * 8 - formattedTime.length() * 6) / 2;
+  // Convert time string to individual characters
+  char timeChars[6];
+  formattedTime.toCharArray(timeChars, 6);
 
   // Display the time on MAX7219 display
   mx.clear();
-  for (int i = 0; i < formattedTime.length(); i++) {
-    mx.setChar(offset + i * 6, formattedTime[i]);
+  int x = 5; // Start displaying characters from 5 pixels to the front
+
+  // Display characters from the array in reverse order (mirrored)
+  for (int i = 0; i < 5; i++) {
+    char c = timeChars[i];
+    mx.setChar(x, c);
+    x += 6; // Move to the next character position (assuming 6 pixels per character)
   }
-  mx.update();
+  mx.update(); // Update the display
 }
