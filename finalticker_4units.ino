@@ -22,8 +22,9 @@ MD_MAX72XX mx = MD_MAX72XX(HARDWARE_TYPE, DATA_PIN, CLK_PIN, CS_PIN, MAX_DEVICES
 const char* ssid = "keinerhierkeinerda";
 const char* password = "mauskatzehund.123";
 
-// API endpoint for fetching Bitcoin prices
+// API endpoints
 const char* apiEndpointUSD = "https://api.coindesk.com/v1/bpi/currentprice/USD.json";
+const char* apiEndpointBlockHeight = "https://mempool.space/api/blocks/tip/height";
 
 // NTP client to get the time
 WiFiUDP ntpUDP;
@@ -31,6 +32,8 @@ NTPClient timeClient(ntpUDP, "pool.ntp.org");
 
 // Timezone offset in seconds (default Brussels, UTC+1)
 long timezoneOffset = 3600;
+
+int lastBlockHeight = 0;
 
 void setup() {
   // Initialize serial communication
@@ -69,6 +72,15 @@ void loop() {
       displayBitcoinPrice(apiEndpointUSD, "USD");
     }
     lastUpdate = millis();
+  }
+
+  // Check for a new block
+  if (WiFi.status() == WL_CONNECTED) {
+    int currentBlockHeight = getLatestBlockHeight();
+    if (currentBlockHeight > lastBlockHeight) {
+      displayNewBlockHeight(currentBlockHeight);
+      lastBlockHeight = currentBlockHeight;
+    }
   }
 
   delay(1000); // Update the time display every second
@@ -131,4 +143,43 @@ void displayBitcoinPrice(const char* apiEndpoint, const char* currency) {
   }
 
   http.end();
+}
+
+int getLatestBlockHeight() {
+  HTTPClient http;
+  http.begin(apiEndpointBlockHeight);
+  int httpResponseCode = http.GET();
+
+  int blockHeight = -1;
+
+  if (httpResponseCode > 0) {
+    String payload = http.getString();
+    blockHeight = payload.toInt();
+  } else {
+    Serial.println("Error fetching latest block height");
+  }
+
+  http.end();
+  return blockHeight;
+}
+
+void displayNewBlockHeight(int blockHeight) {
+  // Convert block height to string
+  char blockHeightString[10];
+  sprintf(blockHeightString, "%d", blockHeight);
+
+  for (int i = 0; i < 3; i++) {
+    mx.clear();
+    mx.print(blockHeightString);
+    mx.update();
+    delay(500); // On for 500ms
+    mx.clear();
+    delay(500); // Off for 500ms
+  }
+
+  // Display the block height for a few seconds after flicker
+  mx.clear();
+  mx.print(blockHeightString);
+  mx.update();
+  delay(5000); // Display for 5 seconds
 }
