@@ -88,7 +88,7 @@ void displayBitcoinPrice(const char* apiEndpoint, const char* currency) {
 
     // Display the price on MAX7219 display
     mx.clear();
-    printCentered(priceFirst5.c_str());
+    displayText(priceFirst5.c_str());
   } else {
     Serial.println("Error fetching Bitcoin price for " + String(currency));
   }
@@ -110,13 +110,12 @@ void displayTime() {
 
   // Display the time on MAX7219 display
   mx.clear();
-  printCentered(timeChars);
+  displayText(timeChars);
 }
 
-void printCentered(const char* text) {
+void displayText(const char* text) {
   int length = strlen(text);
-  int totalWidth = length * 6; // 5 pixels per character plus 1 pixel for spacing
-  int startPosition = (MAX_DEVICES * 8 - totalWidth) / 2;
+  int startPosition = 1; // Start at position 1 for better centering
 
   for (int i = 0; i < length; i++) {
     mx.setChar(startPosition, text[i]);
