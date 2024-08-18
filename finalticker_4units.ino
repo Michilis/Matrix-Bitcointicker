@@ -86,9 +86,25 @@ void displayBitcoinPrice(const char* apiEndpoint, const char* currency) {
     // Get only the first 5 characters of the price
     String priceFirst5 = price.substring(0, 5);
 
+    // Convert price string to individual characters
+    char priceChars[6]; // Limit to 5 characters
+    priceFirst5.toCharArray(priceChars, 6);
+
     // Display the price on MAX7219 display
     mx.clear();
-    displayText(priceFirst5.c_str());
+    int length = strlen(priceChars);
+
+    // Start displaying characters from 5 pixels to the front
+    int x = 5;
+
+    // Display characters from the array in reverse order (mirrored)
+    for (int i = length - 1; i >= 0; i--) {
+      char c = priceChars[i];
+      mx.setChar(x, c);
+      x += 6; // Move to the next character position (assuming 6 pixels per character)
+    }
+    mx.update(); // Update the display
+    delay(5000); // Display time for 5 seconds
   } else {
     Serial.println("Error fetching Bitcoin price for " + String(currency));
   }
@@ -110,15 +126,10 @@ void displayTime() {
 
   // Display the time on MAX7219 display
   mx.clear();
-  displayText(timeChars);
-}
+  int startPosition = 0; // Start at position 0 for better centering
 
-void displayText(const char* text) {
-  int length = strlen(text);
-  int startPosition = 1; // Start at position 1 for better centering
-
-  for (int i = 0; i < length; i++) {
-    mx.setChar(startPosition, text[i]);
+  for (int i = 0; i < strlen(timeChars); i++) {
+    mx.setChar(startPosition, timeChars[i]);
     startPosition += 6; // Move to the next character position (5 pixels + 1 space)
   }
   mx.update(); // Update the display
