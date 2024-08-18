@@ -26,7 +26,7 @@ const char* apiEndpointUSD = "https://api.coindesk.com/v1/bpi/currentprice/USD.j
 
 // NTP Client to get time (Brussels timezone is UTC + 2 hours during DST, adjust as needed)
 WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, "pool.ntp.org", 7200, 60000); // Brussels is UTC+2
+NTPClient timeClient(ntpUDP, "pool.ntp.org", 3600, 60000); // Brussels is UTC+1, adjust 3600 for standard time, 7200 for DST
 
 // Display intervals (in milliseconds)
 const unsigned long displayBitcoinPriceDuration = 21000; // 21 seconds
@@ -113,17 +113,21 @@ void displayBitcoinPrice(const char* apiEndpoint, const char* currency) {
 
 void displayTime() {
   timeClient.update();
-  String formattedTime = timeClient.getFormattedTime().substring(0, 5); // Display HH:MM
+  unsigned long rawTime = timeClient.getEpochTime();
+  rawTime += 3600; // Adjust for the timezone, change this offset according to DST
 
-  // Convert time string to individual characters
+  unsigned long hours = (rawTime  % 86400L) / 3600;
+  unsigned long minutes = (rawTime % 3600) / 60;
+
+  // Format time as HH:MM
   char timeChars[6];
-  formattedTime.toCharArray(timeChars, 6);
+  sprintf(timeChars, "%02lu:%02lu", hours, minutes);
 
   // Display the time on MAX7219 display
   mx.clear();
   int x = 5; // Start displaying characters from 5 pixels to the front
 
-  // Display characters from the array in reverse order (mirrored)
+  // Display characters from the array
   for (int i = 0; i < 5; i++) {
     char c = timeChars[i];
     mx.setChar(x, c);
