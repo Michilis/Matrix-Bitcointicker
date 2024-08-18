@@ -24,9 +24,9 @@ const char* password = "mauskatzehund.123";
 // API endpoint for fetching Bitcoin prices
 const char* apiEndpointUSD = "https://api.coindesk.com/v1/bpi/currentprice/USD.json";
 
-// NTP Client to get time (Brussels timezone is UTC + 2 hours during DST, adjust as needed)
+// NTP Client to get time (Brussels timezone is UTC + 1 hour, adjust as needed)
 WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, "pool.ntp.org", 3600, 60000); // Brussels is UTC+1, adjust 3600 for standard time, 7200 for DST
+NTPClient timeClient(ntpUDP, "pool.ntp.org", 3600, 60000); // Brussels is UTC+1
 
 // Display intervals (in milliseconds)
 const unsigned long displayBitcoinPriceDuration = 21000; // 21 seconds
@@ -86,24 +86,9 @@ void displayBitcoinPrice(const char* apiEndpoint, const char* currency) {
     // Get only the first 5 characters of the price
     String priceFirst5 = price.substring(0, 5);
 
-    // Convert price string to individual characters
-    char priceChars[6]; // Limit to 5 characters
-    priceFirst5.toCharArray(priceChars, 6);
-
     // Display the price on MAX7219 display
     mx.clear();
-    int length = strlen(priceChars);
-
-    // Start displaying characters from 5 pixels to the front
-    int x = 5;
-
-    // Display characters from the array in reverse order (mirrored)
-    for (int i = length - 1; i >= 0; i--) {
-      char c = priceChars[i];
-      mx.setChar(x, c);
-      x += 6; // Move to the next character position (assuming 6 pixels per character)
-    }
-    mx.update(); // Update the display
+    printCentered(priceFirst5.c_str());
   } else {
     Serial.println("Error fetching Bitcoin price for " + String(currency));
   }
@@ -125,13 +110,17 @@ void displayTime() {
 
   // Display the time on MAX7219 display
   mx.clear();
-  int x = 5; // Start displaying characters from 5 pixels to the front
+  printCentered(timeChars);
+}
 
-  // Display characters from the array
-  for (int i = 0; i < 5; i++) {
-    char c = timeChars[i];
-    mx.setChar(x, c);
-    x += 6; // Move to the next character position (assuming 6 pixels per character)
+void printCentered(const char* text) {
+  int length = strlen(text);
+  int totalWidth = length * 6; // 5 pixels per character plus 1 pixel for spacing
+  int startPosition = (MAX_DEVICES * 8 - totalWidth) / 2;
+
+  for (int i = 0; i < length; i++) {
+    mx.setChar(startPosition, text[i]);
+    startPosition += 6; // Move to the next character position (5 pixels + 1 space)
   }
   mx.update(); // Update the display
 }
