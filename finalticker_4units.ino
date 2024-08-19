@@ -97,8 +97,7 @@ void displayBitcoinPrice(const char* apiEndpoint, const char* currency) {
     // Start displaying characters from 5 pixels to the front
     int x = 5;
 
-    // Display characters from the array in reverse order (mirrored)
-    for (int i = length - 1; i >= 0; i--) {
+    for (int i = 0; i < length; i++) {
       char c = priceChars[i];
       mx.setChar(x, c);
       x += 6; // Move to the next character position (assuming 6 pixels per character)
@@ -124,25 +123,14 @@ void displayTime() {
   char timeChars[6];
   sprintf(timeChars, "%02lu:%02lu", hours, minutes);
 
-  // Reverse the time string to correct the display
-  reverseString(timeChars);
-
   // Display the time on MAX7219 display
   mx.clear();
-  int startPosition = 1; // Start at position 1 to move the text slightly to the left
+  int x = 5; // Start at position 5 to match the price's display position
 
   for (int i = 0; i < strlen(timeChars); i++) {
-    mx.setChar(startPosition, timeChars[i]);
-    startPosition += 6; // Move to the next character position (5 pixels + 1 space)
+    char c = timeChars[i];
+    mx.setChar(x, c);
+    x += 6; // Move to the next character position (5 pixels + 1 space)
   }
   mx.update(); // Update the display
-}
-
-void reverseString(char* str) {
-  int len = strlen(str);
-  for (int i = 0; i < len / 2; i++) {
-    char temp = str[i];
-    str[i] = str[len - i - 1];
-    str[len - i - 1] = temp;
-  }
 }
