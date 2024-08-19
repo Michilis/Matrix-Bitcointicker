@@ -66,6 +66,7 @@ void loop() {
       if (currentTime - lastSwitchTime >= displayBitcoinPriceDuration) {
         lastSwitchTime = currentTime;
         showingPrice = false;
+        mx.clear();
       } else {
         displayBitcoinPrice(apiEndpointUSD, "USD");
       }
@@ -73,6 +74,7 @@ void loop() {
       if (currentTime - lastSwitchTime >= displayTimeDuration) {
         lastSwitchTime = currentTime;
         showingPrice = true;
+        mx.clear();
       } else {
         displayTime();
       }
@@ -105,18 +107,14 @@ void displayBitcoinPrice(const char* apiEndpoint, const char* currency) {
 
     // Display the price on MAX7219 display
     mx.clear();
-    int length = strlen(priceChars);
-
-    // Start displaying characters from 5 pixels to the front
     int x = 5;
 
-    for (int i = 0; i < length; i++) {
+    for (int i = 0; i < strlen(priceChars); i++) {
       char c = priceChars[i];
       mx.setChar(x, c);
       x += 6; // Move to the next character position (assuming 6 pixels per character)
     }
     mx.update(); // Update the display
-    delay(5000); // Display time for 5 seconds
   } else {
     Serial.println("Error fetching Bitcoin price for " + String(currency));
   }
@@ -135,6 +133,13 @@ void displayTime() {
   // Format time as HH:MM
   char timeChars[6];
   sprintf(timeChars, "%02lu:%02lu", hours, minutes);
+
+  // Reverse the time string
+  for (int i = 0; i < strlen(timeChars) / 2; i++) {
+    char temp = timeChars[i];
+    timeChars[i] = timeChars[strlen(timeChars) - i - 1];
+    timeChars[strlen(timeChars) - i - 1] = temp;
+  }
 
   // Display the time on MAX7219 display
   mx.clear();
