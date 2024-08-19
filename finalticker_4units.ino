@@ -32,6 +32,9 @@ NTPClient timeClient(ntpUDP, "pool.ntp.org", 3600, 60000); // Brussels is UTC+1
 const unsigned long displayBitcoinPriceDuration = 21000; // 21 seconds
 const unsigned long displayTimeDuration = 30000; // 30 seconds
 
+unsigned long lastSwitchTime = 0;
+bool showingPrice = true;
+
 void setup() {
   // Initialize serial communication
   Serial.begin(115200);
@@ -58,12 +61,22 @@ void setup() {
 
 void loop() {
   if (WiFi.status() == WL_CONNECTED) {
-    // Alternate between displaying Bitcoin price and time
-    displayBitcoinPrice(apiEndpointUSD, "USD");
-    delay(displayBitcoinPriceDuration); // Show Bitcoin price for the configured duration
-
-    displayTime();
-    delay(displayTimeDuration); // Show time for the configured duration
+    unsigned long currentTime = millis();
+    if (showingPrice) {
+      if (currentTime - lastSwitchTime >= displayBitcoinPriceDuration) {
+        lastSwitchTime = currentTime;
+        showingPrice = false;
+      } else {
+        displayBitcoinPrice(apiEndpointUSD, "USD");
+      }
+    } else {
+      if (currentTime - lastSwitchTime >= displayTimeDuration) {
+        lastSwitchTime = currentTime;
+        showingPrice = true;
+      } else {
+        displayTime();
+      }
+    }
   }
 
   delay(1000); // Short delay to avoid rapid looping
@@ -116,7 +129,7 @@ void displayTime() {
   unsigned long rawTime = timeClient.getEpochTime();
   rawTime += 3600; // Adjust for the timezone, change this offset according to DST
 
-  unsigned long hours = (rawTime  % 86400L) / 3600;
+  unsigned long hours = (rawTime % 86400L) / 3600;
   unsigned long minutes = (rawTime % 3600) / 60;
 
   // Format time as HH:MM
