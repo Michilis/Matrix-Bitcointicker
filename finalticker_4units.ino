@@ -31,9 +31,12 @@ NTPClient timeClient(ntpUDP, "pool.ntp.org", 3600, 60000); // Brussels is UTC+1
 // Display intervals (in milliseconds)
 const unsigned long displayBitcoinPriceDuration = 21000; // 21 seconds
 const unsigned long displayTimeDuration = 30000; // 30 seconds
+const unsigned long priceUpdateInterval = 60000; // Update price every minute
 
 unsigned long lastSwitchTime = 0;
-bool showingPrice = true;
+unsigned long lastPriceUpdateTime = 0;
+bool showingPrice = false;
+String currentPrice = "";
 
 void setup() {
   // Initialize serial communication
@@ -57,18 +60,29 @@ void setup() {
   // Initialize time client
   timeClient.begin();
   timeClient.update();
+
+  // Initial price fetch
+  updateBitcoinPrice();
 }
 
 void loop() {
   if (WiFi.status() == WL_CONNECTED) {
     unsigned long currentTime = millis();
+    
+    // Update price every minute
+    if (currentTime - lastPriceUpdateTime >= priceUpdateInterval) {
+      lastPriceUpdateTime = currentTime;
+      updateBitcoinPrice();
+    }
+
+    // Toggle between showing price and time
     if (showingPrice) {
       if (currentTime - lastSwitchTime >= displayBitcoinPriceDuration) {
         lastSwitchTime = currentTime;
         showingPrice = false;
         mx.clear();
       } else {
-        displayBitcoinPrice(apiEndpointUSD, "USD");
+        displayBitcoinPrice();
       }
     } else {
       if (currentTime - lastSwitchTime >= displayTimeDuration) {
@@ -84,42 +98,41 @@ void loop() {
   delay(1000); // Short delay to avoid rapid looping
 }
 
-void displayBitcoinPrice(const char* apiEndpoint, const char* currency) {
+void updateBitcoinPrice() {
   HTTPClient http;
-  http.begin(apiEndpoint);
+  http.begin(apiEndpointUSD);
   int httpResponseCode = http.GET();
 
   if (httpResponseCode > 0) {
     String payload = http.getString();
     DynamicJsonDocument doc(1024);
     deserializeJson(doc, payload);
-    String price = doc["bpi"][currency]["rate"].as<String>();
+    currentPrice = doc["bpi"]["USD"]["rate"].as<String>();
 
     // Remove commas from the price string
-    price.replace(",", "");
+    currentPrice.replace(",", "");
 
     // Get only the first 5 characters of the price
-    String priceFirst5 = price.substring(0, 5);
-
-    // Convert price string to individual characters
-    char priceChars[6]; // Limit to 5 characters
-    priceFirst5.toCharArray(priceChars, 6);
-
-    // Display the price on MAX7219 display
-    mx.clear();
-    int x = 5;
-
-    for (int i = 0; i < strlen(priceChars); i++) {
-      char c = priceChars[i];
-      mx.setChar(x, c);
-      x += 6; // Move to the next character position (assuming 6 pixels per character)
-    }
-    mx.update(); // Update the display
+    currentPrice = currentPrice.substring(0, 5);
   } else {
-    Serial.println("Error fetching Bitcoin price for " + String(currency));
+    Serial.println("Error fetching Bitcoin price");
+    currentPrice = "ERROR";
   }
 
   http.end();
+}
+
+void displayBitcoinPrice() {
+  // Display the price on MAX7219 display
+  mx.clear();
+  int x = 5; // Start at position 5 to match the desired display position
+
+  for (int i = 0; i < currentPrice.length(); i++) {
+    char c = currentPrice[i];
+    mx.setChar(x, c);
+    x += 6; // Move to the next character position (assuming 6 pixels per character)
+  }
+  mx.update(); // Update the display
 }
 
 void displayTime() {
@@ -133,13 +146,6 @@ void displayTime() {
   // Format time as HH:MM
   char timeChars[6];
   sprintf(timeChars, "%02lu:%02lu", hours, minutes);
-
-  // Reverse the time string
-  for (int i = 0; i < strlen(timeChars) / 2; i++) {
-    char temp = timeChars[i];
-    timeChars[i] = timeChars[strlen(timeChars) - i - 1];
-    timeChars[strlen(timeChars) - i - 1] = temp;
-  }
 
   // Display the time on MAX7219 display
   mx.clear();
